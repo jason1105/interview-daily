@@ -360,7 +360,7 @@
 
       // 追问方向特殊处理
       const fu = b.followup || '';
-      const fuLines = fu.split(/\n|？|?/).map(s => s.trim()).filter(s => s.length > 4);
+      const fuLines = fu.split(/[\n？?]/).map(s => s.trim()).filter(s => s.length > 4);
       if (fuLines.length > 0) {
         const ul = document.createElement('ul');
         ul.className = 'followup-list';

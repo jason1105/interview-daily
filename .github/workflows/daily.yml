@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   generate:
@@ -36,4 +37,16 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add questions/
           git diff --staged --quiet || git commit -m "chore: daily question $(date -u +%Y-%m-%d)"
-          git push
+          # --- 改造：bot 不再直推 main，改为开 PR 并自动合并 ---
+          git fetch origin main --depth=1 -q
+          if [ -z "$(git log FETCH_HEAD..HEAD --oneline)" ]; then
+            echo "No new commits; nothing to do."
+            exit 0
+          fi
+          BRANCH="bot/$(date -u +%Y%m%d-%H%M%S)"
+          git push -u origin "HEAD:$BRANCH"
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          gh pr create --base main --head "$BRANCH" \
+            --title "$(git log -1 --pretty=%s)" \
+            --body "Automated update by workflow: ${{ github.workflow }}"
+          gh pr merge "$BRANCH" --squash --delete-branch

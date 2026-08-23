@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-08-23",
+    "role": "DevOps工程师",
+    "question": "请描述如何在Kubernetes中实现蓝绿部署，并解释其优点和潜在的风险。",
+    "type": "系统设计",
+    "difficulty": "中等"
+  },
+  {
     "date": "2026-08-22",
     "role": "机器学习工程师",
     "question": "请解释什么是过拟合（Overfitting），并描述至少两种常用的防止过拟合的方法。",

@@ -153,7 +153,9 @@ def main():
             "type": question_data.get("type", ""),
             "difficulty": question_data.get("difficulty", ""),
         })
-        index = index[:60]  # 最多保留 60 天
+        # 不再截断索引：questions/*.json 永久保留，索引一旦截断，
+        # 超出窗口的历史题目就再也无法被检索到，等于静默丢失归档。
+        # 单条索引约 150 字节，一年约 55KB，展示侧由前端分页处理。
 
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump(index, f, ensure_ascii=False, indent=2)

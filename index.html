@@ -391,19 +391,54 @@
     try {
       const res = await fetch(`questions/index.json?t=${Date.now()}`);
       const index = await res.json();
-      const ul = document.getElementById('history-list');
-      ul.innerHTML = '';
-      index.forEach(item => {
-        const li = document.createElement('li');
-        li.className = 'history-item';
-        li.innerHTML = `
-          <span class="history-date">${item.date}</span>
-          <span class="history-role">${item.role}</span>
-          <span class="history-q">${item.question}</span>
-        `;
-        ul.appendChild(li);
-      });
+      renderHistory(index);
     } catch {}
+  }
+
+  /* ── 历史列表分页渲染 ──
+     索引不再有 60 条上限，可能积累到数百条，
+     因此展示侧默认只渲染最近 PAGE_SIZE 条，其余按需展开。 */
+  const PAGE_SIZE = 30;
+  let historyShown = PAGE_SIZE;
+  let historyData = [];
+
+  function renderHistory(index) {
+    historyData = Array.isArray(index) ? index : [];
+    const ul = document.getElementById('history-list');
+    ul.innerHTML = '';
+
+    if (historyData.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      li.style.color = 'var(--muted)';
+      li.textContent = '尚无历史题目，等待每日工作流首次生成';
+      ul.appendChild(li);
+      return;
+    }
+
+    historyData.slice(0, historyShown).forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      li.innerHTML = `
+        <span class="history-date">${item.date}</span>
+        <span class="history-role">${item.role}</span>
+        <span class="history-q">${item.question}</span>
+      `;
+      ul.appendChild(li);
+    });
+
+    const old = document.getElementById('history-more');
+    if (old) old.remove();
+    if (historyShown < historyData.length) {
+      const btn = document.createElement('button');
+      btn.id = 'history-more';
+      btn.textContent = `显示更多（还有 ${historyData.length - historyShown} 条）`;
+      btn.style.cssText =
+        'margin-top:1rem;padding:.5rem 1rem;cursor:pointer;background:none;' +
+        'border:1px solid var(--muted);border-radius:6px;color:var(--muted);font:inherit';
+      btn.onclick = () => { historyShown += PAGE_SIZE; renderHistory(historyData); };
+      ul.parentNode.appendChild(btn);
+    }
   }
 
   load();

@@ -84,14 +84,27 @@ def generate_question(role_info: dict, date_str: str) -> dict:
 
     raw = response.choices[0].message.content.strip()
 
-    # 提取 JSON（有时模型会加 markdown 代码块）
-    if "```" in raw:
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    raw = raw.strip()
+    # 稳健提取 JSON：不同模型可能包 markdown 围栏、加前言/思维链，
+    # 或直接返回裸对象。统一抓取第一个完整的 {...} 再解析。
+    def _extract_json(text):
+        import re
+        # 先剥 markdown 代码块
+        m = re.search(r"```(?:json)?\s*(.+?)```", text, re.S)
+        if m:
+            text = m.group(1).strip()
+        # 再抓第一个 { 到最后一个 } 之间的内容
+        i, j = text.find("{"), text.rfind("}")
+        if i != -1 and j != -1 and j > i:
+            return text[i:j+1]
+        return text
 
-    data = json.loads(raw)
+    cleaned = _extract_json(raw)
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        print("❌ 无法解析模型输出为 JSON。原始输出前 500 字符：", file=sys.stderr)
+        print(repr(raw[:500]), file=sys.stderr)
+        raise
     data["date"] = date_str
     data["role"] = role_info["name"]
 

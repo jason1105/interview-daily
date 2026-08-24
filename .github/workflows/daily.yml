@@ -28,7 +28,7 @@ jobs:
       - name: Generate today's question
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MODEL: deepseek/deepseek-chat
+          MODEL: ${{ vars.OPENROUTER_MODEL || 'deepseek/deepseek-chat' }}
         run: python generate.py
 
       - name: Commit and push

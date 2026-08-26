@@ -28,8 +28,11 @@ jobs:
 
       - name: Generate today's question
         env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MODEL: ${{ vars.OPENROUTER_MODEL || 'deepseek/deepseek-chat' }}
+          MODEL: ${{ vars.OPENROUTER_MODEL || '' }}
         run: python generate.py
 
       - name: Commit and push

@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-08-26",
+    "role": "安全工程师",
+    "question": "请描述一次你在实际项目中发现并修复安全漏洞的经历，你是如何发现它、评估其影响并最终修复的？",
+    "type": "项目经验",
+    "difficulty": "中等"
+  },
+  {
     "date": "2026-08-25",
     "role": "移动端工程师",
     "question": "请详细解释 Android 中 Handler 机制的工作原理，包括 Looper、MessageQueue 和 Handler 三者之间的关系，并说明为什么在…",

@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile all Python files
+        run: |
+          set -e
+          found=0
+          while IFS= read -r -d '' f; do
+            echo "py_compile: $f"
+            python -m py_compile "$f"
+            found=1
+          done < <(find . -name '*.py' -not -path './.git/*' -print0)
+          [ "$found" = "1" ] && echo "✅ 所有 Python 文件编译通过" || echo "（无 Python 文件）"
+      - name: Validate workflow YAML
+        run: |
+          python - <<'PYEOF'
+          import glob, sys
+          try:
+              import yaml
+          except ImportError:
+              import subprocess
+              subprocess.run([sys.executable, "-m", "pip", "install", "pyyaml", "-q"], check=True)
+              import yaml
+          bad = 0
+          for f in glob.glob(".github/workflows/*.yml") + glob.glob(".github/workflows/*.yaml"):
+              try:
+                  yaml.safe_load(open(f, encoding="utf-8"))
+                  print(f"✅ {f}")
+              except Exception as e:
+                  bad = 1
+                  print(f"❌ {f}: {e}")
+          sys.exit(bad)
+          PYEOF

@@ -16,8 +16,8 @@ except ImportError:
     from openai import OpenAI
 
 # ── 配置 ─────────────────────────────────────────────────────────────
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-MODEL = os.environ.get("MODEL", "deepseek/deepseek-chat")
+OPENROUTER_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
+MODEL = os.environ.get("LLM_MODEL") or os.environ.get("MODEL") or "deepseek-v4-flash"
 
 # 技术岗位轮转列表
 ROLES = [
@@ -66,7 +66,7 @@ PROMPT_TEMPLATE = """你是一位资深技术面试官，请为【{role}】岗�
 def generate_question(role_info: dict, date_str: str) -> dict:
     """调用 OpenRouter 生成面试题"""
     client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
+        base_url=os.environ.get("LLM_BASE_URL") or "https://api.deepseek.com",
         api_key=OPENROUTER_API_KEY,
     )
 
@@ -117,7 +117,7 @@ def generate_question(role_info: dict, date_str: str) -> dict:
 
 def main():
     if not OPENROUTER_API_KEY:
-        print("❌ 缺少 OPENROUTER_API_KEY 环境变量")
+        print("❌ 缺少 LLM_API_KEY / OPENROUTER_API_KEY 环境变量")
         sys.exit(1)
 
     today = datetime.now(timezone.utc)

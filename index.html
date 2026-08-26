@@ -209,6 +209,29 @@
     .history-role { min-width: 100px; }
     .history-q { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+    /* 历史条目：可点击展开 + 已复习标记 */
+    .history-item { cursor: pointer; transition: background .15s; border-radius: 6px; padding-left: .4rem; padding-right: .4rem; }
+    .history-item:hover { background: var(--surface); }
+    .history-item.reviewed { opacity: .5; }
+    .history-item.reviewed .history-q { text-decoration: line-through; }
+    .review-toggle {
+      flex: none; width: 20px; height: 20px; border-radius: 50%;
+      border: 1px solid var(--border); background: none; color: var(--muted);
+      cursor: pointer; font-size: .7rem; line-height: 1; display: inline-flex;
+      align-items: center; justify-content: center; transition: all .15s;
+    }
+    .review-toggle:hover { border-color: var(--green); color: var(--green); }
+    .history-item.reviewed .review-toggle { background: var(--green); border-color: var(--green); color: var(--bg); }
+    .history-detail {
+      padding: .5rem .6rem 1rem; margin: 0 0 .3rem;
+      border-left: 2px solid var(--accent); background: var(--surface);
+      border-radius: 0 6px 6px 0; font-size: .85rem; line-height: 1.6;
+    }
+    .history-detail h4 { color: var(--accent); font-size: .8rem; margin: .8rem 0 .3rem; }
+    .history-detail h4:first-child { margin-top: 0; }
+    .history-detail .q-full { color: var(--text); font-weight: 600; margin-bottom: .6rem; }
+    .history-detail .loading-d { color: var(--muted); }
+
     /* Date display */
     .date-display { color: var(--muted); font-size: 0.82rem; margin-left: auto; }
 
@@ -402,6 +425,52 @@
   let historyShown = PAGE_SIZE;
   let historyData = [];
 
+  /* ── 复习标记（localStorage，仅本浏览器）── */
+  const REVIEW_KEY = 'interview-daily-reviewed';
+  function getReviewed() {
+    try { return JSON.parse(localStorage.getItem(REVIEW_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function toggleReviewed(date, li) {
+    const r = getReviewed();
+    if (r[date]) delete r[date]; else r[date] = 1;
+    try { localStorage.setItem(REVIEW_KEY, JSON.stringify(r)); } catch {}
+    li.classList.toggle('reviewed');
+  }
+
+  /* ── 点击历史条目，展开当天完整拆解 ── */
+  function fmtFollowup(fu) {
+    const lines = (fu || '').split(/[\n？?]/).map(x => x.trim()).filter(x => x.length > 4);
+    if (!lines.length) return `<p>${fu || ''}</p>`;
+    return '<ul style="margin:.3rem 0 0 1.1rem">' +
+      lines.map(l => `<li style="margin:.2rem 0">${l.replace(/^\d+\.\s*/, '')}</li>`).join('') + '</ul>';
+  }
+  async function toggleDetail(li, date) {
+    const next = li.nextElementSibling;
+    if (next && next.classList.contains('history-detail')) { next.remove(); return; }
+    // 收起其他已展开的
+    document.querySelectorAll('.history-detail').forEach(d => d.remove());
+    const panel = document.createElement('li');
+    panel.className = 'history-detail';
+    panel.innerHTML = '<div class="loading-d">加载中…</div>';
+    li.after(panel);
+    try {
+      const res = await fetch(`questions/${date}.json?t=${Date.now()}`);
+      if (!res.ok) throw new Error(res.status);
+      const d = await res.json();
+      const b = d.breakdown || {};
+      panel.innerHTML =
+        `<div class="q-full">${d.question || ''}</div>` +
+        (b.focus ? `<h4>考察点</h4><p>${b.focus}</p>` : '') +
+        (b.framework ? `<h4>解题框架</h4><p>${b.framework}</p>` : '') +
+        (b.example ? `<h4>示例</h4><p>${b.example}</p>` : '') +
+        (b.pitfalls ? `<h4>易错点</h4><p>${b.pitfalls}</p>` : '') +
+        (b.followup ? `<h4>追问方向</h4>${fmtFollowup(b.followup)}` : '');
+    } catch (e) {
+      panel.innerHTML = `<div class="loading-d" style="color:var(--red)">该题详情加载失败（${e.message}）</div>`;
+    }
+  }
+
   function renderHistory(index) {
     historyData = Array.isArray(index) ? index : [];
     const ul = document.getElementById('history-list');
@@ -416,14 +485,26 @@
       return;
     }
 
+    const reviewed = getReviewed();
     historyData.slice(0, historyShown).forEach(item => {
       const li = document.createElement('li');
-      li.className = 'history-item';
+      li.className = 'history-item' + (reviewed[item.date] ? ' reviewed' : '');
       li.innerHTML = `
+        <button class="review-toggle" title="标记已复习">✓</button>
         <span class="history-date">${item.date}</span>
         <span class="history-role">${item.role}</span>
         <span class="history-q">${item.question}</span>
       `;
+      // 点击条目（非复习按钮）展开/收起详情
+      li.addEventListener('click', (e) => {
+        if (e.target.classList.contains('review-toggle')) return;
+        toggleDetail(li, item.date);
+      });
+      // 复习按钮
+      li.querySelector('.review-toggle').addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleReviewed(item.date, li);
+      });
       ul.appendChild(li);
     });
 

@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write   # 失败时自动开 issue 告警
 
 jobs:
   generate:
@@ -50,3 +51,24 @@ jobs:
             --title "$(git log -1 --pretty=%s)" \
             --body "Automated update by workflow: ${{ github.workflow }}"
           gh pr merge "$BRANCH" --squash --delete-branch
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="⚠️ 工作流 ${{ github.workflow }} 运行失败"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BODY="[${{ github.workflow }}]($RUN_URL) 于 $(date -u '+%Y-%m-%d %H:%M UTC') 失败（分支 ${{ github.ref_name }}，触发 ${{ github.event_name }}）。请查看日志。"
+          # 去重：已有同名 open issue 就追加评论，否则新建，避免刷屏
+          EXISTING=$(gh issue list --state open --search "in:title $TITLE" --json number,title \
+                     --jq "[.[] | select(.title == \"$TITLE\")] | .[0].number")
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+            echo "已在 issue #$EXISTING 追加告警"
+          else
+            gh label create ci-failure --color d73a4a --description "自动化工作流失败告警" 2>/dev/null || true
+            gh issue create --title "$TITLE" --body "$BODY" --label ci-failure 2>/dev/null \
+              || gh issue create --title "$TITLE" --body "$BODY"
+            echo "已新建告警 issue"
+          fi

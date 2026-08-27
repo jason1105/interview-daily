@@ -134,6 +134,11 @@ def main():
 
     question_data = generate_question(role_info, date_str)
 
+    # 防空响应：题目无效则不写盘，保留 latest.json / index（不被空覆盖）
+    if not isinstance(question_data, dict) or not str(question_data.get("question", "")).strip():
+        print("❌ 模型返回空/无效题目，跳过写入以避免覆盖已有数据。", file=sys.stderr)
+        sys.exit(1)
+
     # 保存当天文件
     questions_dir = os.path.join(os.path.dirname(__file__), "questions")
     os.makedirs(questions_dir, exist_ok=True)

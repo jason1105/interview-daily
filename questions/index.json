@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-09-20",
+    "role": "数据工程师",
+    "question": "有一张电商订单表 orders(order_id, user_id, city, amount, status, create_time)，请写一条 SQL 统…",
+    "type": "数据库",
+    "difficulty": "中等"
+  },
+  {
     "date": "2026-09-19",
     "role": "全栈工程师",
     "question": "请设计一个短链接服务：用户可以提交长链接生成短链接，其他用户访问短链接时跳转到原始地址。要求支持较高并发读取、短码唯一且低延迟，并说明前后端 API、数据库设计…",

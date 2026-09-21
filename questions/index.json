@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-09-21",
+    "role": "机器学习工程师",
+    "question": "假设你要为一个电商场景构建点击率（CTR）预估模型，样本量约千万级，类别特征高维稀疏，正样本率约2%。请从数据划分、特征处理、模型选择、评估和线上监控五个方面说…",
+    "type": "系统设计",
+    "difficulty": "中等"
+  },
+  {
     "date": "2026-09-20",
     "role": "数据工程师",
     "question": "有一张电商订单表 orders(order_id, user_id, city, amount, status, create_time)，请写一条 SQL 统…",

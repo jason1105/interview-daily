@@ -1,0 +1,21 @@
+{
+  "question": "公司计划将一个微服务应用从手动部署迁移到 Kubernetes 上的自动化发布体系。请设计一套 CI/CD/GitOps 方案，覆盖构建与安全扫描、多环境部署、密钥管理、回滚策略和可观测性。你会如何落地并权衡取舍？",
+  "type": "系统设计",
+  "difficulty": "中等",
+  "tags": [
+    "Kubernetes",
+    "GitOps",
+    "CI/CD",
+    "系统设计"
+  ],
+  "breakdown": {
+    "focus": "考察 CI/CD 与 GitOps 方案设计能力；Kubernetes 多环境部署、配置和密钥治理；发布回滚、可观测性与安全供应链意识。",
+    "framework": "1. 澄清需求与约束：应用架构、环境数量、发布频率、SLO、合规和现有工具链。\n2. 设计 CI：代码拉取、测试、SAST/依赖/镜像扫描、构建不可变镜像、签名和推送制品库。\n3. 设计 CD/GitOps：环境配置仓库、Argo CD/Flux、PR 审批、自动或手动同步、环境隔离。\n4. 处理安全与配置：密钥管理、OIDC、最小权限、RBAC、策略即代码和供应链准入。\n5. 设计回滚与可观测性：健康检查、指标日志追踪、自动回滚、DB 迁移兼容和 DORA 度量。",
+    "example": "我会先确认约束：微服务数量、发布频率、SLO、合规要求和现有工具链。整体采用“CI 构建不可变制品 + GitOps 持续部署”的模式。CI 端使用 GitHub Actions 或 GitLab CI，代码提交后触发单元测试、静态扫描、依赖与容器镜像漏洞扫描，再用 Kaniko/BuildKit 构建镜像，按 Git SHA 打 tag，推送 Harbor 并做签名。CD 端用 Argo CD 监听环境配置仓库，按 dev/staging/prod 分目录；dev 自动同步，staging 自动但需通过集成测试，prod 通过 PR 审批后同步。K8s 侧用 Helm/Kustomize 管理环境差异，通过 namespace、NetworkPolicy、ResourceQuota 做隔离。密钥使用 External Secrets Operator 从 Vault 拉取，避免明文进 Git；CI/CD 权限按最小权限和 OIDC 短期凭据配置。回滚优先 revert Git 配置提交，让 Argo CD 重新同步；紧急时用 Argo CD rollback 或 kubectl rollout undo，但数据库迁移采用 expand/contract，保证前后兼容。可观测性集成 Prometheus、Grafana、Loki、OpenTelemetry，并加入部署后健康检查和自动回滚。最后用 DORA 指标、审计日志和告警持续优化流水线。",
+    "pitfalls": "1. 只罗列 Jenkins、Argo CD、Prometheus 等工具，缺少从代码到生产的闭环和数据流。\n2. 忽略密钥、权限和供应链安全，把敏感信息放入 Git 或长期 CI 变量。\n3. 回滚只考虑镜像 tag，忽略数据库、配置、消息协议和依赖兼容性。",
+    "followup": "1. 如何设计金丝雀发布或蓝绿发布，并基于指标自动回滚？\n2. 数据库 schema 变更如何与应用发布解耦，并保证可回滚？\n3. 如何用 SBOM、镜像签名和准入控制保障供应链安全？"
+  },
+  "date": "2026-10-12",
+  "role": "DevOps工程师",
+  "practice_url": "https://github.com/donnemartin/system-design-primer"
+}

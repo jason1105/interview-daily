@@ -1,21 +1,22 @@
 {
-  "question": "在订单创建场景中，客户端可能因超时重试导致同一请求被多次提交。请设计一个后端创建订单接口的幂等方案，说明请求标识、存储结构、并发控制以及失败重试下的处理方式。",
-  "type": "系统设计",
+  "question": "请解释浏览器事件循环中宏任务与微任务的区别，并分析下面代码的输出顺序及原因：\nconsole.log('start');\nsetTimeout(() => console.log('timeout'), 0);\nPromise.resolve().then(() => console.log('promise1')).then(() => console.log('promise2'));\n(async () => { console.log('async start'); await Promise.resolve(); console.log('async end'); })();\nconsole.log('end');",
+  "type": "语言特性",
   "difficulty": "中等",
   "tags": [
-    "幂等",
-    "分布式",
-    "并发控制",
-    "接口设计"
+    "JavaScript",
+    "事件循环",
+    "宏任务",
+    "微任务",
+    "异步编程"
   ],
   "breakdown": {
-    "focus": "考察幂等键设计、分布式并发控制、事务与失败重试处理，以及方案在真实订单场景下的可落地性。",
-    "framework": "1. 明确幂等边界和请求唯一标识；2. 设计幂等记录存储结构与状态机；3. 使用唯一索引或分布式锁处理并发；4. 将幂等记录与业务事务绑定并返回一致结果；5. 处理异常、重试、过期清理和监控告警。",
-    "example": "首先由客户端或业务方生成稳定的幂等键，例如 requestId，或使用 userId + 业务单号组合，不能由服务端每次随机生成。服务端建立幂等表，字段包括 tenant_id、request_id、biz_type、status、result_summary、expire_at、created_at、updated_at，并对 tenant_id + request_id + biz_type 建唯一索引。请求进入后先尝试插入一条 status=PROCESSING 的记录：如果插入成功，则继续执行业务创建订单，并在同一数据库事务中更新幂等记录为 SUCCESS，同时保存订单号等结果摘要；如果唯一键冲突，则查询已有记录，若已成功则直接返回相同结果，若处理中则返回处理中或让客户端稍后重试，若失败则根据业务策略决定是否允许重试。并发控制以数据库唯一索引作为最终兜底，可结合 Redis SETNX 降低热点冲突，但不能只依赖 Redis。业务失败时要明确记录 FAILED 及失败原因，避免客户端用同一请求号无限重试；可设置过期时间并定期清理历史记录。对于业务超时但实际成功的情况，需通过查询订单或状态机补偿确认结果，确保重试请求返回一致结果。",
-    "pitfalls": "只使用 Redis 分布式锁而缺少数据库唯一索引兜底；幂等键由服务端随机生成或使用不稳定的参数，导致重试无法命中同一记录；采用先查询再插入的实现，存在并发窗口；业务成功但幂等记录未更新，导致重复创建或状态不一致。",
-    "followup": "幂等键应该如何选择，和业务单号、请求 ID 的关系是什么？Redis 与数据库唯一索引如何配合，异常时如何兜底？如果业务处理超时但实际已经成功，服务端如何保证重试请求返回一致结果？"
+    "focus": "考察候选人对浏览器事件循环机制、宏任务与微任务执行顺序、async/await 与 Promise 微任务注册时机的理解。",
+    "framework": "1. 先说明 JavaScript 单线程、调用栈、任务队列与事件循环的基本模型；2. 区分同步代码、宏任务队列和微任务队列；3. 按“同步代码执行完先清空微任务，再取下一个宏任务”的规则逐行分析；4. 解释 async 函数中 await 前代码同步执行、await 后代码作为微任务继续执行的时机；5. 汇总最终输出顺序并总结判断规律。",
+    "example": "参考答案：浏览器中 JavaScript 是单线程执行，事件循环会先执行同步代码，清空当前调用栈后优先清空微任务队列，再执行下一个宏任务。代码执行时，先输出 start；随后注册 setTimeout 宏任务；Promise.resolve().then 注册 promise1 的微任务；接着立即执行 async 函数中 await 前的同步代码，输出 async start，遇到 await Promise.resolve() 后将后续代码挂起为微任务；最后执行同步代码输出 end。此时同步代码结束，开始清空微任务：先执行较早注册的 promise1，输出 promise1，并注册 promise2；再执行 await 后续代码，输出 async end；然后执行 promise2，输出 promise2。微任务清空后，事件循环取出 setTimeout 宏任务，输出 timeout。因此最终顺序为：start、async start、end、promise1、async end、promise2、timeout。关键点是：Promise.then 和 await 后续逻辑都属于微任务；await 前的代码是同步执行；微任务总在当前宏任务结束后、下一个宏任务开始前清空。",
+    "pitfalls": "1. 把 Promise.then 回调误认为宏任务，导致输出顺序判断错误；2. 忽略 async/await 中 await 前同步执行、await 后进入微任务队列的细节；3. 认为 setTimeout(..., 0) 会立刻执行，或与微任务在同一队列中按注册顺序竞争。",
+    "followup": "1. 如果 setTimeout 的延迟为 0 和 4ms，浏览器中的行为可能有什么差异？2. 如果 Promise 回调中抛出异常，事件循环和未处理拒绝会如何表现？3. Node.js 的事件循环阶段与浏览器事件循环有哪些主要区别？"
   },
-  "date": "2026-10-17",
-  "role": "后端工程师",
-  "practice_url": "https://github.com/donnemartin/system-design-primer"
+  "date": "2026-10-18",
+  "role": "前端工程师",
+  "practice_url": "https://github.com/jwasham/coding-interview-university"
 }

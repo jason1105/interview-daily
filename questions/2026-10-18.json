@@ -1,0 +1,22 @@
+{
+  "question": "请解释浏览器事件循环中宏任务与微任务的区别，并分析下面代码的输出顺序及原因：\nconsole.log('start');\nsetTimeout(() => console.log('timeout'), 0);\nPromise.resolve().then(() => console.log('promise1')).then(() => console.log('promise2'));\n(async () => { console.log('async start'); await Promise.resolve(); console.log('async end'); })();\nconsole.log('end');",
+  "type": "语言特性",
+  "difficulty": "中等",
+  "tags": [
+    "JavaScript",
+    "事件循环",
+    "宏任务",
+    "微任务",
+    "异步编程"
+  ],
+  "breakdown": {
+    "focus": "考察候选人对浏览器事件循环机制、宏任务与微任务执行顺序、async/await 与 Promise 微任务注册时机的理解。",
+    "framework": "1. 先说明 JavaScript 单线程、调用栈、任务队列与事件循环的基本模型；2. 区分同步代码、宏任务队列和微任务队列；3. 按“同步代码执行完先清空微任务，再取下一个宏任务”的规则逐行分析；4. 解释 async 函数中 await 前代码同步执行、await 后代码作为微任务继续执行的时机；5. 汇总最终输出顺序并总结判断规律。",
+    "example": "参考答案：浏览器中 JavaScript 是单线程执行，事件循环会先执行同步代码，清空当前调用栈后优先清空微任务队列，再执行下一个宏任务。代码执行时，先输出 start；随后注册 setTimeout 宏任务；Promise.resolve().then 注册 promise1 的微任务；接着立即执行 async 函数中 await 前的同步代码，输出 async start，遇到 await Promise.resolve() 后将后续代码挂起为微任务；最后执行同步代码输出 end。此时同步代码结束，开始清空微任务：先执行较早注册的 promise1，输出 promise1，并注册 promise2；再执行 await 后续代码，输出 async end；然后执行 promise2，输出 promise2。微任务清空后，事件循环取出 setTimeout 宏任务，输出 timeout。因此最终顺序为：start、async start、end、promise1、async end、promise2、timeout。关键点是：Promise.then 和 await 后续逻辑都属于微任务；await 前的代码是同步执行；微任务总在当前宏任务结束后、下一个宏任务开始前清空。",
+    "pitfalls": "1. 把 Promise.then 回调误认为宏任务，导致输出顺序判断错误；2. 忽略 async/await 中 await 前同步执行、await 后进入微任务队列的细节；3. 认为 setTimeout(..., 0) 会立刻执行，或与微任务在同一队列中按注册顺序竞争。",
+    "followup": "1. 如果 setTimeout 的延迟为 0 和 4ms，浏览器中的行为可能有什么差异？2. 如果 Promise 回调中抛出异常，事件循环和未处理拒绝会如何表现？3. Node.js 的事件循环阶段与浏览器事件循环有哪些主要区别？"
+  },
+  "date": "2026-10-18",
+  "role": "前端工程师",
+  "practice_url": "https://github.com/jwasham/coding-interview-university"
+}

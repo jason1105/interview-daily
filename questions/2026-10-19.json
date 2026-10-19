@@ -1,0 +1,22 @@
+{
+  "question": "请设计一个支持多用户的任务管理应用的核心全栈方案，说明前后端如何划分职责、关键 API 如何设计、数据库表如何建模，并重点说明鉴权与任务列表分页搜索的实现思路。",
+  "type": "系统设计",
+  "difficulty": "中等",
+  "tags": [
+    "全栈架构",
+    "API设计",
+    "数据库建模",
+    "鉴权",
+    "分页搜索"
+  ],
+  "breakdown": {
+    "focus": "考察候选人是否具备端到端的全栈设计能力，包括前后端职责边界、RESTful API 设计、关系型数据库建模、用户鉴权与权限隔离，以及分页搜索场景下的查询与索引设计。",
+    "framework": "1. 明确需求与边界：多用户、任务 CRUD、状态筛选、关键词搜索、分页、用户只能访问自己的任务。2. 设计整体架构：前端 SPA/服务端渲染、后端 API 服务、数据库、鉴权中间件。3. 设计数据模型：users 表、tasks 表及必要索引。4. 设计 API：认证接口、任务列表接口、任务增删改查接口，约定分页参数和响应结构。5. 说明关键实现：JWT/Session 鉴权、任务归属校验、分页搜索的 SQL 与索引、错误处理与扩展性。",
+    "example": "整体上采用前后端分离架构：前端负责页面渲染、表单校验、状态管理和调用 API；后端负责认证、权限校验、业务逻辑和持久化。数据库使用 PostgreSQL/MySQL，核心表包括 users 和 tasks。users 表保存 id、email、password_hash、created_at；tasks 表保存 id、user_id、title、description、status、priority、due_date、created_at、updated_at，并通过 user_id 关联用户。任务列表查询必须强制带 user_id 条件，避免越权访问。API 可设计为：POST /api/auth/login 登录并返回 JWT；GET /api/tasks?page=1&pageSize=20&status=todo&keyword=report 获取当前用户任务列表；POST /api/tasks 创建任务；PATCH /api/tasks/:id 更新任务；DELETE /api/tasks/:id 删除任务。鉴权使用 JWT 放入 Authorization Header，后端中间件解析用户身份并注入 request.user；对任务详情、更新、删除操作必须校验 task.user_id 与当前用户一致。分页采用 page/pageSize 或游标分页，响应返回 items、total、page、pageSize。搜索可对 title 和 description 做模糊查询，但要注意性能：为 user_id、status、created_at 建立组合索引，例如 (user_id, status, created_at)，关键词搜索量较大时可引入全文索引或搜索引擎。前端使用统一请求封装处理 token、401 跳转登录和错误提示，列表页维护筛选、分页和加载状态。这样设计既满足多用户权限隔离，也兼顾可维护性和后续扩展。",
+    "pitfalls": "1. 只讲前端页面或只讲后端接口，没有体现全栈端到端设计。2. 任务查询时只按 task id 查询而忽略 user_id 校验，导致越权访问风险。3. 分页搜索只给出 LIMIT/OFFSET，没有考虑总量统计、索引和关键词搜索性能。",
+    "followup": "1. 如果任务量达到千万级，分页和关键词搜索你会如何优化？2. JWT 过期、刷新和注销你如何设计？3. 如果前端需要离线编辑或多人协作，你会如何调整架构？"
+  },
+  "date": "2026-10-19",
+  "role": "全栈工程师",
+  "practice_url": "https://github.com/donnemartin/system-design-primer"
+}

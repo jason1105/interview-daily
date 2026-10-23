@@ -1,0 +1,21 @@
+{
+  "question": "给定一个正整数数组 nums 和一个正整数 target，请返回和大于等于 target 的长度最小的连续子数组长度；若不存在则返回 0。请给出实现并分析时间复杂度，同时说明算法正确性所依赖的关键条件。",
+  "type": "算法",
+  "difficulty": "中等",
+  "tags": [
+    "滑动窗口",
+    "数组",
+    "双指针",
+    "复杂度分析"
+  ],
+  "breakdown": {
+    "focus": "考察滑动窗口/双指针的适用条件与实现能力；考察对正整数条件下窗口和单调性的理解；考察边界处理与时间复杂度分析。",
+    "framework": "第一步，明确题目要求：连续子数组、和大于等于 target、求最小长度；第二步，说明由于元素均为正数，窗口和具有单调性，可以使用滑动窗口；第三步，描述左右指针与窗口和 total 的维护方式；第四步，给出代码并处理不存在的情况；第五步，分析时间复杂度和空间复杂度，并说明正确性。",
+    "example": "采用滑动窗口。维护左指针 left、窗口和 total 和答案 ans。右指针 right 从左到右遍历数组，每次把 nums[right] 加入 total；当 total >= target 时，说明当前窗口满足条件，用 right-left+1 更新 ans，然后不断把 nums[left] 移出窗口并右移 left，直到 total < target，从而寻找更短的有效窗口。由于所有元素均为正整数，右移右指针只会使窗口和增大，左移左指针只会使窗口和减小，因此每个元素最多进入和离开窗口各一次，时间复杂度为 O(n)，空间复杂度为 O(1)。代码示例：def min_subarray_len(nums, target):\n    left = 0\n    total = 0\n    ans = len(nums) + 1\n    for right, x in enumerate(nums):\n        total += x\n        while total >= target:\n            ans = min(ans, right - left + 1)\n            total -= nums[left]\n            left += 1\n    return 0 if ans == len(nums) + 1 else ans。例如 nums=[2,3,1,2,4,3], target=7，最短有效子数组为 [4,3]，返回 2。若遍历结束后 ans 未被更新，则返回 0。",
+    "pitfalls": "未说明或忽略数组元素为正整数这一关键条件，直接对任意整数数组使用滑动窗口；更新答案后忘记移动左指针缩小窗口，导致无法得到最小长度；边界处理不完整，例如 target 较大导致不存在答案时未返回 0。",
+    "followup": "如果数组中包含负数，应该如何调整算法？能否用前缀和加数据结构做到 O(n) 或 O(n log n)？如果要求返回具体的子数组而不是长度，代码应如何修改？如果数据以流式方式到达，如何维护满足条件的最短窗口？"
+  },
+  "date": "2026-10-23",
+  "role": "算法工程师",
+  "practice_url": "https://leetcode.cn/problemset/"
+}

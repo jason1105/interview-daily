@@ -1,0 +1,22 @@
+{
+  "question": "请解释浏览器中的事件循环机制，并说明宏任务与微任务的执行顺序。请结合以下代码给出输出顺序及原因：\nconsole.log('A');\nsetTimeout(() => console.log('B'), 0);\nPromise.resolve().then(() => console.log('C'));\nasync function foo() { console.log('D'); await Promise.resolve(); console.log('E'); }\nfoo();\nconsole.log('F');",
+  "type": "语言特性",
+  "difficulty": "中等",
+  "tags": [
+    "事件循环",
+    "宏任务",
+    "微任务",
+    "Promise",
+    "async/await"
+  ],
+  "breakdown": {
+    "focus": "1. 考察浏览器事件循环与任务队列模型；2. 考察宏任务与微任务的边界、执行顺序及清空机制；3. 考察 async/await、Promise.then 与同步代码的调度关系。",
+    "framework": "1. 先说明事件循环基本流程：执行同步代码，当前宏任务结束后清空微任务队列，再进入下一轮宏任务；2. 将代码中的同步输出、宏任务、微任务分别标记；3. 按入队顺序列出微任务队列，并说明 await 后续代码会进入微任务；4. 按“同步代码 -> 微任务 -> 宏任务”的顺序推导输出；5. 补充该机制与渲染、用户交互和异步状态更新的关系。",
+    "example": "浏览器事件循环会不断从任务队列中取任务执行。通常先执行一个宏任务，例如整体 script、setTimeout 回调、用户交互等；每执行完一个宏任务后，会清空当前微任务队列，例如 Promise.then、queueMicrotask、MutationObserver，以及 async/await 中 await 之后的续体；微任务清空后再进入下一轮宏任务。因此同一轮中微任务总在下一个宏任务之前执行。\n本题开始同步执行：首先输出 A；遇到 setTimeout 会把 B 放入宏任务队列；Promise.resolve().then 会把 C 放入微任务队列；调用 foo() 时先同步输出 D，执行到 await Promise.resolve() 时暂停 foo，并把 E 的续体放入微任务队列；然后继续同步执行并输出 F。当前宏任务即整体 script 结束后，微任务队列依次为 C、E，因此输出 C、E；微任务清空后执行 setTimeout 回调，输出 B。最终顺序为 A、D、F、C、E、B。\n这样设计的原因是：微任务适合在当前操作完成后、下一次渲染或下一个宏任务前尽快处理状态更新，例如 Promise 回调；宏任务代表相对独立的调度单元，便于让出主线程，给渲染和用户交互留下机会。",
+    "pitfalls": "1. 把 setTimeout(..., 0) 误认为会立即执行，忽略微任务需要先清空；2. 误认为 async 函数中 await 会阻塞主线程，或认为 await 后面的代码会同步立即执行；3. 混淆宏任务与微任务，错误地认为每执行一个微任务就切换到下一个宏任务。",
+    "followup": "1. 如果 setTimeout(..., 0) 与 requestAnimationFrame 同时存在，执行顺序通常如何理解？2. Node.js 的事件循环与浏览器事件循环有哪些主要差异？3. 如果微任务中继续产生新的微任务，会怎样执行？是否可能阻塞页面渲染？"
+  },
+  "date": "2026-10-28",
+  "role": "前端工程师",
+  "practice_url": "https://github.com/jwasham/coding-interview-university"
+}

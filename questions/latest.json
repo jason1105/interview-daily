@@ -1,22 +1,21 @@
 {
-  "question": "请设计一个社交产品中的「点赞」功能：同一用户对同一内容重复点击不能重复计数，高并发下计数不能丢失，前端点击后要立即有反馈并最终与后端一致。请从前端交互、接口设计、并发控制到数据存储，完整说明你的方案。",
-  "type": "系统设计",
+  "question": "订单表 orders 包含 order_id、user_id、order_amount、status、created_at 等字段，status 取值为 paid/refunded。请写 SQL 统计每个用户最近一次成功支付（status='paid'）的订单金额，并统计每日成功支付 GMV；同时说明在订单表按 created_at 分区、数据量很大时如何优化这两个查询。",
+  "type": "数据库",
   "difficulty": "中等",
   "tags": [
-    "幂等设计",
-    "乐观更新",
-    "并发控制",
-    "Redis",
-    "数据一致性"
+    "SQL",
+    "窗口函数",
+    "聚合统计",
+    "分区优化"
   ],
   "breakdown": {
-    "focus": "考察候选人对全栈链路的整体把控能力：一是服务端幂等与唯一约束的设计（接口可重试、不产生脏数据）；二是高并发计数的正确性与性能取舍（避免读改写丢更新、避免实时聚合查询）；三是前端乐观更新与失败回滚、响应乱序处理，保证最终一致性。",
-    "framework": "第一步，先明确需求边界与量级，包括 QPS、点赞总量、是否要求强一致、是否需要热度排序。第二步，设计数据模型，给出点赞关系表以及唯一索引，并说明计数如何存储。第三步，设计接口的幂等方案，说明重复请求、重试、并发请求分别如何处理。第四步，说明高并发下计数如何实现，例如 Redis 计数加异步写入数据库、原子自增、增量对账。第五步，说明前端乐观更新的状态流转、失败回滚、防止连点与响应乱序，最后补充限流、降级和监控。",
-    "example": "整体分四层来设计。第一层是数据模型：建点赞关系表 like_record(user_id, target_id, target_type, created_at)，在 (user_id, target_id, target_type) 上建唯一索引，从存储层保证同一用户对同一目标只有一条记录；计数不做实时 COUNT(*)，而是单独维护计数。第二层是接口幂等：点赞接口设计为 PUT /like，语义幂等，前端可安全重试；后端用 INSERT IGNORE 或 ON DUPLICATE KEY UPDATE，根据影响行数判断是首次点赞还是重复点击，重复时直接返回当前状态码而不是报错。第三层是并发计数：热点计数放 Redis，用 HINCRBY 做 +1/-1，同时把变更写入消息队列或本地增量表，异步批量写入数据库；写库时用 UPDATE counter SET cnt = cnt + delta 的原子写法，绝不先读再写。Redis 与数据库之间是最终一致，定时任务用关系表 COUNT 做对账校正。第四层是前端：点击瞬间本地切换状态并让计数 +1，按钮进入 loading 防连点；请求失败则回滚状态并 toast 提示；同时用递增的请求序号或时间戳丢弃过期响应，避免快速连点时响应乱序导致 UI 与服务端相反。最后在网关做用户维度限流，当 Redis 不可用时降级为直接写数据库，并加行锁或分布式锁保证正确性。",
-    "pitfalls": "1. 只在前端做了防重复点击，服务端没有唯一约束或幂等键，重试、重放或并发请求下产生重复点赞与虚高计数。2. 计数用先读后写的方式（GET 再 SET，或 SELECT 后 UPDATE 绝对值），并发下丢失更新；或者每次请求都 COUNT(*) 聚合，数据库压力被打爆。3. 乐观更新只做了加一，没有失败回滚和乱序处理，用户看到的状态与实际数据长期不一致，且没有对账与修复机制。",
-    "followup": "1. 如果 Redis 故障或计数与数据库已经不一致，你会如何设计对账与在线修复方案，且不影响用户读写？2. 取消点赞与点赞请求并发交错到达时，如何保证最终状态正确？3. 当点赞数据达到千万级并需要按热度排序返回列表时，存储结构与查询方案要怎么调整？"
+    "focus": "重点考察 SQL 去重与窗口函数使用、聚合统计口径、分区裁剪与索引优化能力；同时关注对订单状态、GMV 和最近一次支付等业务口径的理解。",
+    "framework": "1. 明确成功支付口径和 GMV 统计口径；2. 用 CTE 先过滤 status='paid' 的订单，减少后续处理数据量；3. 用 ROW_NUMBER 按 user_id 分组并按 created_at 倒序取最近一笔；4. 用日期函数按天聚合 paid 金额得到每日 GMV；5. 从分区裁剪、索引设计、预聚合、数据倾斜等角度说明大数据量优化方案。",
+    "example": "先明确口径：GMV 只统计 status='paid' 的订单金额，退款订单不计入；用户最近一次成功支付按 created_at 倒序、order_id 倒序兜底取第一条。用户最近支付金额可用窗口函数：WITH paid_orders AS (SELECT order_id, user_id, order_amount, created_at FROM orders WHERE status = 'paid'), ranked AS (SELECT order_id, user_id, order_amount, created_at, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC, order_id DESC) AS rn FROM paid_orders) SELECT user_id, order_amount AS latest_paid_amount FROM ranked WHERE rn = 1; 每日 GMV 可写：SELECT DATE(created_at) AS dt, SUM(order_amount) AS gmv FROM orders WHERE status = 'paid' GROUP BY DATE(created_at); 大数据量下，查询条件应尽量带 created_at 范围以触发分区裁剪，避免全表扫描；可为 (status, created_at) 及 (user_id, status, created_at) 设计索引或二级分区；每日 GMV 可落到 DWS 日汇总表做预聚合，用户最近订单可维护最新订单快照或拉链表；同时避免 SELECT *、无谓 DISTINCT 和全量排序，并关注热点用户或日期导致的数据倾斜。",
+    "pitfalls": "1. 未处理同一用户多笔支付，直接取 MAX(created_at) 后再关联，容易导致创建时间和金额错配；2. 混淆 GMV 口径，把 refunded 或未支付订单计入；3. 只写 SQL 而不说明分区裁剪、索引和预聚合，或在大表上直接全量排序、DISTINCT。",
+    "followup": "如果同一订单存在支付、退款、再次支付等多条状态流水，如何定义 GMV 和用户最近一次成功支付？在 Hive/Spark 中如何避免用户最近订单计算的全表 Shuffle？每日 GMV 需要按渠道、地区等多维汇总时，如何设计数仓分层和预聚合？"
   },
-  "date": "2026-10-29",
-  "role": "全栈工程师",
-  "practice_url": "https://github.com/donnemartin/system-design-primer"
+  "date": "2026-10-30",
+  "role": "数据工程师",
+  "practice_url": "https://sqlzoo.net/"
 }

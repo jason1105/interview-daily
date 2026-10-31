@@ -1,21 +1,21 @@
 {
-  "question": "订单表 orders 包含 order_id、user_id、order_amount、status、created_at 等字段，status 取值为 paid/refunded。请写 SQL 统计每个用户最近一次成功支付（status='paid'）的订单金额，并统计每日成功支付 GMV；同时说明在订单表按 created_at 分区、数据量很大时如何优化这两个查询。",
-  "type": "数据库",
+  "question": "请设计一个面向电商推荐场景的机器学习在线推理系统，要求支持低延迟（P99小于100ms）、水平扩展、模型热更新和线上效果监控。请说明整体架构、关键组件以及如何保证训练与服务特征一致性。",
+  "type": "系统设计",
   "difficulty": "中等",
   "tags": [
-    "SQL",
-    "窗口函数",
-    "聚合统计",
-    "分区优化"
+    "机器学习系统设计",
+    "在线推理",
+    "特征一致性",
+    "模型监控"
   ],
   "breakdown": {
-    "focus": "重点考察 SQL 去重与窗口函数使用、聚合统计口径、分区裁剪与索引优化能力；同时关注对订单状态、GMV 和最近一次支付等业务口径的理解。",
-    "framework": "1. 明确成功支付口径和 GMV 统计口径；2. 用 CTE 先过滤 status='paid' 的订单，减少后续处理数据量；3. 用 ROW_NUMBER 按 user_id 分组并按 created_at 倒序取最近一笔；4. 用日期函数按天聚合 paid 金额得到每日 GMV；5. 从分区裁剪、索引设计、预聚合、数据倾斜等角度说明大数据量优化方案。",
-    "example": "先明确口径：GMV 只统计 status='paid' 的订单金额，退款订单不计入；用户最近一次成功支付按 created_at 倒序、order_id 倒序兜底取第一条。用户最近支付金额可用窗口函数：WITH paid_orders AS (SELECT order_id, user_id, order_amount, created_at FROM orders WHERE status = 'paid'), ranked AS (SELECT order_id, user_id, order_amount, created_at, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC, order_id DESC) AS rn FROM paid_orders) SELECT user_id, order_amount AS latest_paid_amount FROM ranked WHERE rn = 1; 每日 GMV 可写：SELECT DATE(created_at) AS dt, SUM(order_amount) AS gmv FROM orders WHERE status = 'paid' GROUP BY DATE(created_at); 大数据量下，查询条件应尽量带 created_at 范围以触发分区裁剪，避免全表扫描；可为 (status, created_at) 及 (user_id, status, created_at) 设计索引或二级分区；每日 GMV 可落到 DWS 日汇总表做预聚合，用户最近订单可维护最新订单快照或拉链表；同时避免 SELECT *、无谓 DISTINCT 和全量排序，并关注热点用户或日期导致的数据倾斜。",
-    "pitfalls": "1. 未处理同一用户多笔支付，直接取 MAX(created_at) 后再关联，容易导致创建时间和金额错配；2. 混淆 GMV 口径，把 refunded 或未支付订单计入；3. 只写 SQL 而不说明分区裁剪、索引和预聚合，或在大表上直接全量排序、DISTINCT。",
-    "followup": "如果同一订单存在支付、退款、再次支付等多条状态流水，如何定义 GMV 和用户最近一次成功支付？在 Hive/Spark 中如何避免用户最近订单计算的全表 Shuffle？每日 GMV 需要按渠道、地区等多维汇总时，如何设计数仓分层和预聚合？"
+    "focus": "考察候选人对端到端机器学习系统的架构设计能力，包括低延迟在线推理、特征平台与训练服务一致性、模型发布回滚与监控治理。",
+    "framework": "第一步澄清业务指标与约束，例如QPS、P99延迟、模型更新频率、可用性和降级要求；第二步给出分层架构，包括离线训练、特征平台、模型仓库、在线推理服务和监控日志；第三步说明低延迟与扩展设计，如缓存、批处理、模型优化和Kubernetes弹性扩缩容；第四步说明模型热更新、灰度发布、AB实验和回滚机制；第五步说明特征一致性、效果监控、漂移检测和故障降级。",
+    "example": "整体可以采用离线训练与在线服务分离的架构。客户端请求经API网关进入推荐在线服务，服务先从在线特征存储或Redis缓存中批量点查用户、物品和上下文特征，然后调用模型推理服务。模型推理可使用Triton、TorchServe或ONNX Runtime，并采用模型量化、算子融合、动态批处理、请求合并和GPU或CPU资源池化来降低延迟。模型文件存放在模型仓库中，推理服务按版本加载模型，通过配置中心实现热更新，并结合灰度发布、影子流量和AB实验逐步放量，出现异常可快速回滚。训练与线上特征一致性通过统一特征平台保证：特征注册中心定义特征口径，离线训练使用特征快照或时间点正确Join，在线服务使用同一套特征变换逻辑，必要时将特征变换下沉到特征平台或模型服务中，并记录特征版本。监控方面需要采集QPS、错误率、P99延迟、CPU和内存、特征缺失率、特征分布漂移、预测分布和线上业务指标，如点击率和转化率；同时保留请求日志和模型版本，支持问题追溯。系统还应具备限流、超时、熔断和降级策略，例如在特征存储不可用时使用默认特征或降级到热门推荐，保证服务稳定性。",
+    "pitfalls": "只讨论模型训练和离线指标，不说明在线服务架构与工程约束；忽视训练与线上特征口径不一致，导致特征穿越或效果下降；没有考虑模型热更新、灰度、回滚、监控和故障降级机制。",
+    "followup": "如果线上QPS突增十倍，你会如何定位瓶颈并扩容？如何检测和治理特征漂移？请进一步说明实时特征与离线特征的一致性如何保障。"
   },
-  "date": "2026-10-30",
-  "role": "数据工程师",
-  "practice_url": "https://sqlzoo.net/"
+  "date": "2026-10-31",
+  "role": "机器学习工程师",
+  "practice_url": "https://github.com/donnemartin/system-design-primer"
 }

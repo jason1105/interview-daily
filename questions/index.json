@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-10-31",
+    "role": "机器学习工程师",
+    "question": "请设计一个面向电商推荐场景的机器学习在线推理系统，要求支持低延迟（P99小于100ms）、水平扩展、模型热更新和线上效果监控。请说明整体架构、关键组件以及如何保…",
+    "type": "系统设计",
+    "difficulty": "中等"
+  },
+  {
     "date": "2026-10-30",
     "role": "数据工程师",
     "question": "订单表 orders 包含 order_id、user_id、order_amount、status、created_at 等字段，status 取值为 pai…",

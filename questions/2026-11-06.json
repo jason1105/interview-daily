@@ -1,0 +1,21 @@
+{
+  "question": "某订单表 orders 已有千万级数据，常见查询为按 user_id 过滤、按 created_at 倒序分页，最近列表页出现明显变慢。请说明你会如何定位问题，并给出索引设计和分页优化方案。",
+  "type": "数据库",
+  "difficulty": "中等",
+  "tags": [
+    "MySQL",
+    "索引优化",
+    "分页查询",
+    "执行计划"
+  ],
+  "breakdown": {
+    "focus": "考察慢查询定位与执行计划分析能力；考察联合索引设计、最左前缀和覆盖索引思想；考察深分页优化及上线验证意识。",
+    "framework": "1. 先确认具体慢 SQL、访问频率和数据分布，查看慢查询日志与监控；2. 使用 explain 或 explain analyze 分析执行计划，关注 type、key、rows、Extra 是否出现 filesort 或大量回表；3. 根据 where 等值条件和 order by 设计联合索引，如 user_id、created_at、id；4. 对深分页采用游标分页或延迟关联，避免大 offset；5. 用真实数据压测验证，并关注索引带来的写入成本、缓存一致性和 P99 指标。",
+    "example": "面对千万级订单表按 user_id 过滤、created_at 倒序分页，我会先抓取具体慢 SQL，使用 explain analyze 查看执行计划中的访问类型、命中索引、扫描行数以及是否出现 filesort 和大量回表；同时结合慢查询日志和监控确认是偶发还是高频问题。若查询形式为 select 常用字段 from orders where user_id=? order by created_at desc limit ?,?，我会建立联合索引（user_id, created_at, id），因为 user_id 等值过滤后，created_at 可直接支持排序，id 用于稳定排序和游标分页。若列表只需要少量字段，可考虑覆盖索引减少回表；若仍需返回较多详情字段，可用延迟关联，即先用覆盖索引查出主键分页，再按主键关联取详情。对于深分页，应避免大 offset，改为基于上一页最后一条记录的 created_at 和 id 做游标查询，例如 where user_id=? and (created_at,id) < (?,?) order by created_at desc,id desc limit N。上线前要用真实数据分布做 explain 和压测，评估索引选择性、写入放大和分页一致性，最后通过监控验证 P99 和慢查询数量是否改善。",
+    "pitfalls": "只给 created_at 或 user_id 建单列索引，导致过滤和排序不能同时高效利用；直接使用大 offset 分页而不做游标分页或延迟关联；不看执行计划和数据分布，盲目加索引导致写入性能下降。",
+    "followup": "如果业务还需要按订单状态过滤，联合索引应如何调整？如果系统按 user_id 分库分表，跨用户查询或运营后台查询如何处理？深分页场景下如果产品要求支持跳页，如何兼容游标分页方案？"
+  },
+  "date": "2026-11-06",
+  "role": "后端工程师",
+  "practice_url": "https://sqlzoo.net/"
+}

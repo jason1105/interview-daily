@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-11-07",
+    "role": "前端工程师",
+    "question": "请解释 JavaScript 事件循环中宏任务与微任务的执行顺序，并结合 Promise、setTimeout 和 async/await 举例说明。若一个微任…",
+    "type": "语言特性",
+    "difficulty": "中等"
+  },
+  {
     "date": "2026-11-06",
     "role": "后端工程师",
     "question": "某订单表 orders 已有千万级数据，常见查询为按 user_id 过滤、按 created_at 倒序分页，最近列表页出现明显变慢。请说明你会如何定位问题，…",

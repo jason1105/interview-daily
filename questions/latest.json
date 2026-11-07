@@ -1,21 +1,21 @@
 {
-  "question": "某订单表 orders 已有千万级数据，常见查询为按 user_id 过滤、按 created_at 倒序分页，最近列表页出现明显变慢。请说明你会如何定位问题，并给出索引设计和分页优化方案。",
-  "type": "数据库",
+  "question": "请解释 JavaScript 事件循环中宏任务与微任务的执行顺序，并结合 Promise、setTimeout 和 async/await 举例说明。若一个微任务中又产生新的微任务，它们会在什么时机执行？",
+  "type": "语言特性",
   "difficulty": "中等",
   "tags": [
-    "MySQL",
-    "索引优化",
-    "分页查询",
-    "执行计划"
+    "事件循环",
+    "微任务",
+    "异步编程",
+    "浏览器"
   ],
   "breakdown": {
-    "focus": "考察慢查询定位与执行计划分析能力；考察联合索引设计、最左前缀和覆盖索引思想；考察深分页优化及上线验证意识。",
-    "framework": "1. 先确认具体慢 SQL、访问频率和数据分布，查看慢查询日志与监控；2. 使用 explain 或 explain analyze 分析执行计划，关注 type、key、rows、Extra 是否出现 filesort 或大量回表；3. 根据 where 等值条件和 order by 设计联合索引，如 user_id、created_at、id；4. 对深分页采用游标分页或延迟关联，避免大 offset；5. 用真实数据压测验证，并关注索引带来的写入成本、缓存一致性和 P99 指标。",
-    "example": "面对千万级订单表按 user_id 过滤、created_at 倒序分页，我会先抓取具体慢 SQL，使用 explain analyze 查看执行计划中的访问类型、命中索引、扫描行数以及是否出现 filesort 和大量回表；同时结合慢查询日志和监控确认是偶发还是高频问题。若查询形式为 select 常用字段 from orders where user_id=? order by created_at desc limit ?,?，我会建立联合索引（user_id, created_at, id），因为 user_id 等值过滤后，created_at 可直接支持排序，id 用于稳定排序和游标分页。若列表只需要少量字段，可考虑覆盖索引减少回表；若仍需返回较多详情字段，可用延迟关联，即先用覆盖索引查出主键分页，再按主键关联取详情。对于深分页，应避免大 offset，改为基于上一页最后一条记录的 created_at 和 id 做游标查询，例如 where user_id=? and (created_at,id) < (?,?) order by created_at desc,id desc limit N。上线前要用真实数据分布做 explain 和压测，评估索引选择性、写入放大和分页一致性，最后通过监控验证 P99 和慢查询数量是否改善。",
-    "pitfalls": "只给 created_at 或 user_id 建单列索引，导致过滤和排序不能同时高效利用；直接使用大 offset 分页而不做游标分页或延迟关联；不看执行计划和数据分布，盲目加索引导致写入性能下降。",
-    "followup": "如果业务还需要按订单状态过滤，联合索引应如何调整？如果系统按 user_id 分库分表，跨用户查询或运营后台查询如何处理？深分页场景下如果产品要求支持跳页，如何兼容游标分页方案？"
+    "focus": "考察对事件循环机制的理解，尤其是宏任务与微任务的调度顺序；考察 Promise 和 async/await 的异步语义；考察对浏览器渲染与任务队列关系的认识。",
+    "framework": "1. 先定义调用栈、宏任务队列、微任务队列和事件循环；2. 说明一轮循环的基本流程：执行同步代码，清空微任务队列，必要时渲染，再取一个宏任务；3. 用示例按输出顺序逐步分析；4. 说明微任务中新产生的微任务会在当前清空阶段继续执行；5. 补充 async/await 的转换语义以及渲染时机和常见误区。",
+    "example": "JavaScript 是单线程的，事件循环负责协调调用栈、宏任务队列和微任务队列。同步代码先进入调用栈执行；遇到 Promise.then、queueMicrotask、MutationObserver 等会把回调放入微任务队列，遇到 setTimeout、setInterval、I/O、UI 事件等会把回调放入宏任务队列。当前同步代码执行完后，事件循环会先清空微任务队列，并且在清空过程中新产生的微任务也会继续执行，直到微任务队列为空；之后浏览器可能进行渲染，再取下一个宏任务执行。例如：console.log('1'); setTimeout(()=>console.log('2'),0); Promise.resolve().then(()=>{console.log('3'); Promise.resolve().then(()=>console.log('4'));}); console.log('5'); 输出顺序是 1、5、3、4、2。因为 1 和 5 是同步代码，先执行；同步结束后清空微任务，先执行 then 输出 3，其中又产生一个微任务，仍会在当前微任务清空阶段执行输出 4；最后才执行 setTimeout 宏任务输出 2。async/await 中 await 后面的代码可理解为 then 回调，也会进入微任务队列。理解这一点对排查异步执行顺序、状态更新时机和渲染性能问题很重要。",
+    "pitfalls": "误以为 setTimeout 0 会立即执行；忽略微任务清空中新产生的微任务仍会在本轮执行；把 async/await 当成同步阻塞或笼统认为 await 后一定进入宏任务。",
+    "followup": "如果微任务中不断产生微任务会发生什么？页面渲染会在哪个阶段发生？React/Vue 中状态更新与微任务/渲染时机有什么关系？"
   },
-  "date": "2026-11-06",
-  "role": "后端工程师",
-  "practice_url": "https://sqlzoo.net/"
+  "date": "2026-11-07",
+  "role": "前端工程师",
+  "practice_url": "https://github.com/jwasham/coding-interview-university"
 }

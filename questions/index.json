@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-11-11",
+    "role": "DevOps工程师",
+    "question": "某公司有多套微服务运行在 Kubernetes 上，目前发布依赖工程师手工执行 kubectl，缺少统一流水线和回滚机制。请设计一条从 Git 提交到生产环境的…",
+    "type": "系统设计",
+    "difficulty": "中等"
+  },
+  {
     "date": "2026-11-10",
     "role": "机器学习工程师",
     "question": "在欺诈检测场景中，正负样本比例约为1:1000。模型A的ROC-AUC为0.93、PR-AUC为0.21；模型B的ROC-AUC为0.89、PR-AUC为0.3…",

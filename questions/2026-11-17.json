@@ -1,0 +1,29 @@
+{
+  "question": "请解释浏览器事件循环中宏任务与微任务的区别，并分析一段包含 setTimeout、Promise.then 和 async/await 的代码执行顺序；同时说明微任务队列在渲染前被清空可能带来什么影响，以及如何避免长任务阻塞页面。",
+  "type": "语言特性",
+  "difficulty": "中等",
+  "tags": [
+    "事件循环",
+    "宏任务与微任务",
+    "async/await",
+    "性能优化"
+  ],
+  "breakdown": {
+    "focus": "考察对浏览器事件循环、任务队列优先级（宏任务/微任务）以及 async/await 语法糖执行机制的理解；考察对渲染时机、主线程阻塞和长任务优化的工程认知。",
+    "framework": "1. 先区分调用栈、宏任务队列、微任务队列和浏览器渲染步骤；2. 按同步代码优先执行、遇到异步 API 注册回调的顺序分析；3. 说明当前宏任务结束后会清空微任务队列，再进入下一轮事件循环并可能触发渲染；4. 结合 async/await 展开解释 await 后面的代码通常进入微任务；5. 补充微任务饥饿、长任务阻塞及拆分任务、Worker、rAF 等优化手段。",
+    "example": "以如下代码为例：\nconsole.log('start');\nsetTimeout(() => console.log('timeout'), 0);\nPromise.resolve().then(() => console.log('promise'));\n(async () => {\n  console.log('async');\n  await Promise.resolve();\n  console.log('after await');\n})();\nconsole.log('end');\n\n输出顺序为：start、async、end、promise、after await、timeout。解释时先说明调用栈同步执行：打印 start 后，setTimeout 注册一个宏任务；Promise.then 注册一个微任务；async IIFE 立即同步执行到第一个 await 前，因此打印 async，await 后面的代码作为微任务延续被注册；随后打印 end。当前宏任务结束后，事件循环会清空微任务队列：先执行较早注册的 promise 回调，再执行 after await，所以输出 promise、after await。微任务清空后浏览器才可能进行渲染，然后进入下一轮事件循环取出 setTimeout 宏任务，输出 timeout。这里的关键是：每个宏任务执行完毕后会清空微任务队列，清空过程中新产生的微任务也会继续执行，直到队列为空；因此大量连续微任务会推迟渲染，造成微任务饥饿或页面卡顿。工程上应避免无限 Promise 链和过碎微任务，把长任务拆分成多个宏任务或帧任务，使用 requestAnimationFrame、setTimeout、MessageChannel 让出主线程，必要时用 Web Worker 处理计算，并通过 Performance API 和 Long Tasks 监控长任务。",
+    "pitfalls": [
+      "把 await 后面的代码简单当成宏任务，忽略其通常以微任务延续执行。",
+      "认为 setTimeout 0 会在所有 Promise 回调之前执行，未理解微任务优先清空。",
+      "只背输出顺序，不能解释渲染时机、微任务饥饿和长任务阻塞的工程影响。"
+    ],
+    "followup": [
+      "如果 setTimeout 0 和 requestAnimationFrame 同时存在，执行顺序与渲染时机如何理解？",
+      "微任务中不断产生新的微任务会发生什么？如何识别和规避微任务饥饿？",
+      "如何通过 Performance API、Long Tasks 或 Chrome DevTools 定位并优化长任务？"
+    ]
+  },
+  "date": "2026-11-17",
+  "role": "前端工程师",
+  "practice_url": "https://github.com/jwasham/coding-interview-university"
+}

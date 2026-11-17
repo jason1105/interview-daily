@@ -1,29 +1,29 @@
 {
-  "question": "某核心业务接口在数据量增长后响应变慢，日志显示一条查询SQL耗时超过2秒。请说明你会如何定位并优化这条慢查询，并给出索引设计、SQL改写或架构层面的优化思路。",
-  "type": "数据库",
+  "question": "请解释浏览器事件循环中宏任务与微任务的区别，并分析一段包含 setTimeout、Promise.then 和 async/await 的代码执行顺序；同时说明微任务队列在渲染前被清空可能带来什么影响，以及如何避免长任务阻塞页面。",
+  "type": "语言特性",
   "difficulty": "中等",
   "tags": [
-    "慢查询",
-    "索引优化",
-    "SQL调优",
-    "执行计划"
+    "事件循环",
+    "宏任务与微任务",
+    "async/await",
+    "性能优化"
   ],
   "breakdown": {
-    "focus": "考察SQL执行计划分析、索引设计与SQL改写能力；考察优化方案验证、线上风险控制和持续监控意识。",
-    "framework": "1. 明确接口、SQL、参数、数据量和慢查询日志上下文；2. 使用EXPLAIN或EXPLAIN ANALYZE查看执行计划，关注type、key、rows、filtered、Extra；3. 分析瓶颈是缺少索引、索引失效、回表过多、排序分组、深分页还是数据分布问题；4. 设计索引或SQL改写方案，并评估写入成本、存储成本和兼容性；5. 在预发或灰度环境验证效果，结合监控和回滚方案上线。",
-    "example": "我会先确认慢查询发生的接口、调用频率、入参分布和表数据量，并从慢查询日志拿到完整SQL。然后用EXPLAIN分析执行计划，重点看是否走索引、扫描行数、回表次数、是否出现filesort或临时表。如果是等值加范围或排序的联合查询，我会按选择性设计联合索引，尽量让过滤和排序字段命中索引，并避免在索引列上做函数、隐式转换或前导模糊匹配。若索引无法覆盖，我会考虑覆盖索引减少回表；若是深分页，可改为基于游标或延迟关联；若是聚合统计慢，可考虑预计算、缓存或异步汇总。优化后我会对比执行计划、扫描行数和接口P95，评估索引对写入的影响，先在预发验证再灰度上线，并观察慢查询数、CPU、IO和业务指标，保留回滚方案。最后把慢查询纳入监控和定期治理，避免只针对单条SQL打补丁。",
+    "focus": "考察对浏览器事件循环、任务队列优先级（宏任务/微任务）以及 async/await 语法糖执行机制的理解；考察对渲染时机、主线程阻塞和长任务优化的工程认知。",
+    "framework": "1. 先区分调用栈、宏任务队列、微任务队列和浏览器渲染步骤；2. 按同步代码优先执行、遇到异步 API 注册回调的顺序分析；3. 说明当前宏任务结束后会清空微任务队列，再进入下一轮事件循环并可能触发渲染；4. 结合 async/await 展开解释 await 后面的代码通常进入微任务；5. 补充微任务饥饿、长任务阻塞及拆分任务、Worker、rAF 等优化手段。",
+    "example": "以如下代码为例：\nconsole.log('start');\nsetTimeout(() => console.log('timeout'), 0);\nPromise.resolve().then(() => console.log('promise'));\n(async () => {\n  console.log('async');\n  await Promise.resolve();\n  console.log('after await');\n})();\nconsole.log('end');\n\n输出顺序为：start、async、end、promise、after await、timeout。解释时先说明调用栈同步执行：打印 start 后，setTimeout 注册一个宏任务；Promise.then 注册一个微任务；async IIFE 立即同步执行到第一个 await 前，因此打印 async，await 后面的代码作为微任务延续被注册；随后打印 end。当前宏任务结束后，事件循环会清空微任务队列：先执行较早注册的 promise 回调，再执行 after await，所以输出 promise、after await。微任务清空后浏览器才可能进行渲染，然后进入下一轮事件循环取出 setTimeout 宏任务，输出 timeout。这里的关键是：每个宏任务执行完毕后会清空微任务队列，清空过程中新产生的微任务也会继续执行，直到队列为空；因此大量连续微任务会推迟渲染，造成微任务饥饿或页面卡顿。工程上应避免无限 Promise 链和过碎微任务，把长任务拆分成多个宏任务或帧任务，使用 requestAnimationFrame、setTimeout、MessageChannel 让出主线程，必要时用 Web Worker 处理计算，并通过 Performance API 和 Long Tasks 监控长任务。",
     "pitfalls": [
-      "只看SQL文本就盲目加索引，不分析执行计划和数据分布",
-      "忽略索引对写入性能、存储成本和维护成本的影响",
-      "在未做灰度验证和回滚预案的情况下直接上线高风险SQL或索引变更"
+      "把 await 后面的代码简单当成宏任务，忽略其通常以微任务延续执行。",
+      "认为 setTimeout 0 会在所有 Promise 回调之前执行，未理解微任务优先清空。",
+      "只背输出顺序，不能解释渲染时机、微任务饥饿和长任务阻塞的工程影响。"
     ],
     "followup": [
-      "联合索引的最左前缀原则是什么？如何判断字段顺序？",
-      "遇到深分页或大范围排序时如何优化？",
-      "如果单表数据量继续增长，何时考虑缓存、读写分离或分库分表？"
+      "如果 setTimeout 0 和 requestAnimationFrame 同时存在，执行顺序与渲染时机如何理解？",
+      "微任务中不断产生新的微任务会发生什么？如何识别和规避微任务饥饿？",
+      "如何通过 Performance API、Long Tasks 或 Chrome DevTools 定位并优化长任务？"
     ]
   },
-  "date": "2026-11-16",
-  "role": "后端工程师",
-  "practice_url": "https://sqlzoo.net/"
+  "date": "2026-11-17",
+  "role": "前端工程师",
+  "practice_url": "https://github.com/jwasham/coding-interview-university"
 }

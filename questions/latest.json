@@ -1,29 +1,22 @@
 {
-  "question": "请解释浏览器事件循环中宏任务与微任务的区别，并分析一段包含 setTimeout、Promise.then 和 async/await 的代码执行顺序；同时说明微任务队列在渲染前被清空可能带来什么影响，以及如何避免长任务阻塞页面。",
-  "type": "语言特性",
+  "question": "请设计一个“文章点赞”功能的全链路方案：前端点击后要立即给出反馈，后端要承受热门文章每秒上万次的点赞请求，同时保证数据不丢失、同一用户不能重复点赞。请说明从前端交互、接口设计到缓存与数据存储的完整方案。",
+  "type": "系统设计",
   "difficulty": "中等",
   "tags": [
-    "事件循环",
-    "宏任务与微任务",
-    "async/await",
-    "性能优化"
+    "高并发",
+    "缓存",
+    "幂等设计",
+    "前后端协作",
+    "最终一致性"
   ],
   "breakdown": {
-    "focus": "考察对浏览器事件循环、任务队列优先级（宏任务/微任务）以及 async/await 语法糖执行机制的理解；考察对渲染时机、主线程阻塞和长任务优化的工程认知。",
-    "framework": "1. 先区分调用栈、宏任务队列、微任务队列和浏览器渲染步骤；2. 按同步代码优先执行、遇到异步 API 注册回调的顺序分析；3. 说明当前宏任务结束后会清空微任务队列，再进入下一轮事件循环并可能触发渲染；4. 结合 async/await 展开解释 await 后面的代码通常进入微任务；5. 补充微任务饥饿、长任务阻塞及拆分任务、Worker、rAF 等优化手段。",
-    "example": "以如下代码为例：\nconsole.log('start');\nsetTimeout(() => console.log('timeout'), 0);\nPromise.resolve().then(() => console.log('promise'));\n(async () => {\n  console.log('async');\n  await Promise.resolve();\n  console.log('after await');\n})();\nconsole.log('end');\n\n输出顺序为：start、async、end、promise、after await、timeout。解释时先说明调用栈同步执行：打印 start 后，setTimeout 注册一个宏任务；Promise.then 注册一个微任务；async IIFE 立即同步执行到第一个 await 前，因此打印 async，await 后面的代码作为微任务延续被注册；随后打印 end。当前宏任务结束后，事件循环会清空微任务队列：先执行较早注册的 promise 回调，再执行 after await，所以输出 promise、after await。微任务清空后浏览器才可能进行渲染，然后进入下一轮事件循环取出 setTimeout 宏任务，输出 timeout。这里的关键是：每个宏任务执行完毕后会清空微任务队列，清空过程中新产生的微任务也会继续执行，直到队列为空；因此大量连续微任务会推迟渲染，造成微任务饥饿或页面卡顿。工程上应避免无限 Promise 链和过碎微任务，把长任务拆分成多个宏任务或帧任务，使用 requestAnimationFrame、setTimeout、MessageChannel 让出主线程，必要时用 Web Worker 处理计算，并通过 Performance API 和 Long Tasks 监控长任务。",
-    "pitfalls": [
-      "把 await 后面的代码简单当成宏任务，忽略其通常以微任务延续执行。",
-      "认为 setTimeout 0 会在所有 Promise 回调之前执行，未理解微任务优先清空。",
-      "只背输出顺序，不能解释渲染时机、微任务饥饿和长任务阻塞的工程影响。"
-    ],
-    "followup": [
-      "如果 setTimeout 0 和 requestAnimationFrame 同时存在，执行顺序与渲染时机如何理解？",
-      "微任务中不断产生新的微任务会发生什么？如何识别和规避微任务饥饿？",
-      "如何通过 Performance API、Long Tasks 或 Chrome DevTools 定位并优化长任务？"
-    ]
+    "focus": "1）全链路分层设计能力：前端乐观更新、接口契约、缓存与持久化的职责划分是否清晰；2）高并发写入与幂等去重：Redis 计数与集合去重、异步批量写入数据库、唯一索引作为最终保障；3）一致性与容错：缓存与数据库核对、MQ 丢消息处理、热点 key 打散与降级限流。",
+    "framework": "第一步：澄清需求与量级估算（峰值 QPS、读写比、是否要求强一致、能否接受秒级最终一致）。第二步：定义接口约定（请求方法、幂等语义、返回体包含 liked 与最新 count、错误码与重复请求处理）。第三步：前端方案（乐观更新、按钮 loading 与防重复点击、失败回滚与提示）。第四步：后端与存储（Redis Set 去重 + INCR 计数、MQ 异步聚合、批量写入数据库、数据库唯一索引保障）。第五步：一致性与容错（定时核对修正、热点 key 分桶、MQ 重试、Redis 故障降级与限流）。",
+    "example": "先澄清量级：单篇热门文章峰值约 1w QPS 写，读远高于写，业务上允许计数秒级不精确但最终必须正确，同一用户不能重复计数。接口设计为 POST /api/articles/{id}/like，body 带 action=like 或 unlike，服务端以 userId + articleId 作为幂等键，返回 {liked, count}，重复请求也返回 200 与最新状态，而不是报错。前端做乐观更新：点击后立刻让计数 +1 并置为已赞态，按钮进入 loading 防止连续点击，请求失败则回滚计数并 toast 提示；页面进入时用 GET 拉取真实状态做校正。后端第一层用 Redis 承接写：SADD user_likes:{articleId} userId 判断是否首次点赞，只有首次成功才 INCR like_count:{articleId}；取消点赞则 SREM 并 DECR，天然幂等。计数读取直接走 Redis，未命中再回源数据库。写入数据库不走同步路径，而是把 {articleId, delta, ts} 投递到 MQ，消费者按 articleId 聚合，每 200ms 或每 500 条批量执行 UPDATE 写入数据库，数据库侧保留唯一索引 (user_id, article_id) 作为最终保障。热点 key 用 hash tag 分桶成 like_count:{id}:0 到 9 再求和，或本地缓存加定时刷新。最后做一致性保障：定时任务比对 Redis 与数据库计数并修正，MQ 消费失败进重试队列，Redis 不可用时降级为直接写数据库并开启限流。整体取舍是牺牲秒级精确换写入吞吐，用幂等加核对保证最终正确。",
+    "pitfalls": "1）只回答 UPDATE article SET like_count = like_count + 1，忽略热点行锁竞争和用户维度去重，在万级 QPS 下数据库会直接被打爆。2）前端不做失败回滚与防重复提交，用户快速连点导致计数虚高，体验和数据都出问题。3）完全没有考虑缓存与数据库的一致性、MQ 消息丢失与重试，也没有讨论 Redis 故障时的降级方案。",
+    "followup": "1）如果 Redis 集群整体不可用，这套方案如何降级，降级期间的数据怎么补回来？2）如何实现“查询我点赞过的文章列表”，并且支持分页？3）热点 key 具体怎么打散，求和时又如何保证读取性能与一致性？"
   },
-  "date": "2026-11-17",
-  "role": "前端工程师",
-  "practice_url": "https://github.com/jwasham/coding-interview-university"
+  "date": "2026-11-18",
+  "role": "全栈工程师",
+  "practice_url": "https://github.com/donnemartin/system-design-primer"
 }

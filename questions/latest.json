@@ -1,22 +1,21 @@
 {
-  "question": "请设计一个“文章点赞”功能的全链路方案：前端点击后要立即给出反馈，后端要承受热门文章每秒上万次的点赞请求，同时保证数据不丢失、同一用户不能重复点赞。请说明从前端交互、接口设计到缓存与数据存储的完整方案。",
-  "type": "系统设计",
+  "question": "有两张表：orders(order_id, user_id, amount, status, paid_at, created_at, updated_at) 和 refunds(refund_id, order_id, amount, status, created_at)。请写 SQL 计算最近30天每天的净收入，即当日支付成功订单金额减去当日退款成功金额，并说明跨天退款、重复退款和时间口径应如何处理。",
+  "type": "数据库",
   "difficulty": "中等",
   "tags": [
-    "高并发",
-    "缓存",
-    "幂等设计",
-    "前后端协作",
-    "最终一致性"
+    "SQL",
+    "指标口径",
+    "数据质量",
+    "数仓建模"
   ],
   "breakdown": {
-    "focus": "1）全链路分层设计能力：前端乐观更新、接口契约、缓存与持久化的职责划分是否清晰；2）高并发写入与幂等去重：Redis 计数与集合去重、异步批量写入数据库、唯一索引作为最终保障；3）一致性与容错：缓存与数据库核对、MQ 丢消息处理、热点 key 打散与降级限流。",
-    "framework": "第一步：澄清需求与量级估算（峰值 QPS、读写比、是否要求强一致、能否接受秒级最终一致）。第二步：定义接口约定（请求方法、幂等语义、返回体包含 liked 与最新 count、错误码与重复请求处理）。第三步：前端方案（乐观更新、按钮 loading 与防重复点击、失败回滚与提示）。第四步：后端与存储（Redis Set 去重 + INCR 计数、MQ 异步聚合、批量写入数据库、数据库唯一索引保障）。第五步：一致性与容错（定时核对修正、热点 key 分桶、MQ 重试、Redis 故障降级与限流）。",
-    "example": "先澄清量级：单篇热门文章峰值约 1w QPS 写，读远高于写，业务上允许计数秒级不精确但最终必须正确，同一用户不能重复计数。接口设计为 POST /api/articles/{id}/like，body 带 action=like 或 unlike，服务端以 userId + articleId 作为幂等键，返回 {liked, count}，重复请求也返回 200 与最新状态，而不是报错。前端做乐观更新：点击后立刻让计数 +1 并置为已赞态，按钮进入 loading 防止连续点击，请求失败则回滚计数并 toast 提示；页面进入时用 GET 拉取真实状态做校正。后端第一层用 Redis 承接写：SADD user_likes:{articleId} userId 判断是否首次点赞，只有首次成功才 INCR like_count:{articleId}；取消点赞则 SREM 并 DECR，天然幂等。计数读取直接走 Redis，未命中再回源数据库。写入数据库不走同步路径，而是把 {articleId, delta, ts} 投递到 MQ，消费者按 articleId 聚合，每 200ms 或每 500 条批量执行 UPDATE 写入数据库，数据库侧保留唯一索引 (user_id, article_id) 作为最终保障。热点 key 用 hash tag 分桶成 like_count:{id}:0 到 9 再求和，或本地缓存加定时刷新。最后做一致性保障：定时任务比对 Redis 与数据库计数并修正，MQ 消费失败进重试队列，Redis 不可用时降级为直接写数据库并开启限流。整体取舍是牺牲秒级精确换写入吞吐，用幂等加核对保证最终正确。",
-    "pitfalls": "1）只回答 UPDATE article SET like_count = like_count + 1，忽略热点行锁竞争和用户维度去重，在万级 QPS 下数据库会直接被打爆。2）前端不做失败回滚与防重复提交，用户快速连点导致计数虚高，体验和数据都出问题。3）完全没有考虑缓存与数据库的一致性、MQ 消息丢失与重试，也没有讨论 Redis 故障时的降级方案。",
-    "followup": "1）如果 Redis 集群整体不可用，这套方案如何降级，降级期间的数据怎么补回来？2）如何实现“查询我点赞过的文章列表”，并且支持分页？3）热点 key 具体怎么打散，求和时又如何保证读取性能与一致性？"
+    "focus": "考察 SQL 聚合与关联能力、指标口径定义能力，以及对订单/退款去重、跨天归属、时区和状态更新等数据质量问题的处理。",
+    "framework": "1. 先明确净收入口径和统计粒度，是按自然日还是按业务日，支付和退款分别用哪个时间字段。\n2. 分别聚合订单日收入和退款日退款，过滤有效状态并按业务主键去重。\n3. 使用日期维表或日期序列生成连续日期，再与两侧聚合结果关联，缺失值补0。\n4. 处理跨天退款、部分退款、重复退款、退款冲正和时区统一问题。\n5. 说明增量同步、幂等更新和与财务流水对账方式。",
+    "example": "高分答案示例：先明确口径：净收入按现金口径统计，订单收入落到 paid_at 所在自然日，退款落到退款成功 created_at 所在自然日；只统计 orders.status='SUCCESS' 和 refunds.status='SUCCESS'，订单按 order_id 去重，退款按 refund_id 去重，部分退款可多次累加，跨天退款不回溯原订单日。SQL 可拆成订单日收入、退款日退款、日期维表三部分：\nWITH order_income AS (\n  SELECT DATE(paid_at) AS dt, SUM(amount) AS income\n  FROM orders\n  WHERE status='SUCCESS'\n    AND paid_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\n    AND paid_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)\n  GROUP BY DATE(paid_at)\n),\nrefund_amount AS (\n  SELECT DATE(created_at) AS dt, SUM(amount) AS refund\n  FROM refunds\n  WHERE status='SUCCESS'\n    AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\n    AND created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)\n  GROUP BY DATE(created_at)\n)\nSELECT d.dt,\n       COALESCE(o.income,0) AS income,\n       COALESCE(r.refund,0) AS refund,\n       COALESCE(o.income,0)-COALESCE(r.refund,0) AS net_income\nFROM date_spine d\nLEFT JOIN order_income o ON d.dt=o.dt\nLEFT JOIN refund_amount r ON d.dt=r.dt\nWHERE d.dt >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\n  AND d.dt < DATE_ADD(CURDATE(), INTERVAL 1 DAY)\nORDER BY d.dt;\n其中 date_spine 可用数仓日期维表或日期序列生成，避免某些日期无订单时漏行。生产上还需统一时区，处理退款撤销/冲正，增量任务按 updated_at 水位同步并用主键幂等更新，最后与财务流水抽样对账。",
+    "pitfalls": "1. 混淆支付时间、创建时间和退款时间，导致收入或退款归属日期错误。\n2. 订单与退款直接关联后聚合，未考虑多次退款或一对多关系，造成金额重复计算。\n3. 只用有数据的日期做分组，导致无订单或退款日期缺失，净收入趋势不连续。",
+    "followup": "1. 如果订单状态会延迟更新，如何设计 T+1 增量任务或快照表保证指标准确？\n2. 出现退款金额大于订单金额、重复退款或退款撤销时，指标和 SQL 应如何兜底？\n3. 如果要求实时净收入，如何基于流式处理实现退撤回撤和 Exactly-once 语义？"
   },
-  "date": "2026-11-18",
-  "role": "全栈工程师",
-  "practice_url": "https://github.com/donnemartin/system-design-primer"
+  "date": "2026-11-19",
+  "role": "数据工程师",
+  "practice_url": "https://sqlzoo.net/"
 }

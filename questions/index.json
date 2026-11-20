@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-11-20",
+    "role": "机器学习工程师",
+    "question": "某推荐系统使用点击日志训练CTR模型，离线AUC很高，但上线后效果明显低于预期。请设计一套系统化排查与改进方案，重点说明如何识别数据泄漏、样本偏差和离线/在线评…",
+    "type": "系统设计",
+    "difficulty": "中等"
+  },
+  {
     "date": "2026-11-19",
     "role": "数据工程师",
     "question": "有两张表：orders(order_id, user_id, amount, status, paid_at, created_at, updated_at) …",

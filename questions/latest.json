@@ -1,29 +1,22 @@
 {
-  "question": "请解释 JavaScript 事件循环中宏任务与微任务的区别，并分析这段代码的输出顺序：setTimeout(() => console.log('timeout'), 0); Promise.resolve().then(() => console.log('promise')); console.log('sync'); 如果微任务中不断产生新的微任务会怎样，如何避免？",
-  "type": "语言特性",
+  "question": "请设计一个团队任务管理应用的核心任务流转功能：成员可以创建任务、分配负责人、修改状态（待办/进行中/已完成）。要求说明前后端接口、数据库表结构，并处理多人同时修改同一任务状态时的数据一致性与幂等性。",
+  "type": "系统设计",
   "difficulty": "中等",
   "tags": [
-    "JavaScript",
-    "事件循环",
-    "异步编程",
-    "性能优化"
+    "全栈设计",
+    "REST API",
+    "数据库设计",
+    "并发控制",
+    "幂等性"
   ],
   "breakdown": {
-    "focus": "考察对事件循环、调用栈、宏任务队列和微任务队列的整体理解；考察宏任务与微任务的执行时机和优先级；考察微任务饥饿问题及其对渲染、交互性能的影响和工程化处理。",
-    "framework": "1. 先说明事件循环基本模型，包括调用栈、宏任务队列、微任务队列；2. 说明每次宏任务执行结束后会先清空微任务队列，再进入渲染或取下一个宏任务；3. 按同步代码、异步注册、队列执行的顺序分析输出；4. 解释微任务中递归创建微任务会导致当前微任务队列无法清空；5. 给出避免策略，如限制递归、任务分片、让出主线程、使用宏任务或 Worker。",
-    "example": "输出顺序是：sync、promise、timeout。执行时先运行同步代码，因此先打印 sync，同时注册了 setTimeout 回调和 Promise.then 回调。setTimeout 回调属于宏任务，会进入宏任务队列；Promise.then 回调属于微任务，会进入微任务队列。当前同步代码执行完、调用栈清空后，事件循环会优先清空微任务队列，所以打印 promise。微任务队列清空后，才会处理下一个宏任务，因此最后打印 timeout。如果在一个微任务中不断产生新的微任务，例如在 then 回调里继续 Promise.resolve().then，事件循环会持续清空微任务队列，导致后面的宏任务、浏览器渲染和用户交互回调被延迟，形成微任务饥饿，页面可能卡顿。避免方式包括不要在微任务中无界递归地创建微任务；将大任务分片，每片执行后通过 setTimeout、MessageChannel、requestAnimationFrame 或 scheduler.postTask 等方式让出主线程；对 CPU 密集任务使用 Web Worker；并限制单次微任务链的执行规模。",
-    "pitfalls": [
-      "把 Promise.then 当成宏任务，误判输出顺序；",
-      "认为微任务会在每个同步语句后立即执行，忽视当前调用栈清空后才处理微任务；",
-      "只背概念，无法解释微任务饥饿对渲染和交互的影响，也缺少工程解决方案。"
-    ],
-    "followup": [
-      "如果 Promise.then 中再注册 Promise.then，执行时机如何变化？",
-      "requestAnimationFrame、setTimeout、MessageChannel、queueMicrotask 分别属于哪类任务或回调时机？",
-      "在 React 或 Vue 的更新流程中，微任务与浏览器渲染时机如何相互影响？"
-    ]
+    "focus": "考察全栈方案拆解能力：从接口契约、数据模型到并发一致性和异常处理；同时关注权限校验、状态机约束和幂等设计。",
+    "framework": "1. 明确需求边界和角色权限；2. 设计数据库表结构与索引；3. 约定 REST API 与错误码；4. 设计状态机、并发控制和幂等方案；5. 说明前端交互、冲突处理和异常回滚。",
+    "example": "首先明确任务状态只能按待办→进行中→已完成流转，创建者和负责人可操作，管理员可管理全部任务。数据库设计 tasks 表：id、title、description、status、assignee_id、creator_id、version、request_id、created_at、updated_at；索引 assignee_id 和 status 组合，便于列表查询。审计表 task_logs 记录 task_id、from_status、to_status、operator_id、request_id、created_at。接口设计：POST /api/tasks 创建任务，请求体含 title、assignee_id 和幂等键 request_id；GET /api/tasks?assignee_id=&status= 查询任务；PATCH /api/tasks/{id}/status 修改状态，请求体含 target_status、version、request_id。服务端先校验权限和状态机，再在事务中执行更新：update tasks set status=?, version=version+1, updated_at=now() where id=? and version=? and status=?；如果影响行数为 0，则返回 409 冲突或 422 非法状态流转。幂等性通过 request_id 唯一索引或幂等记录表保证，重复请求直接返回首次结果。创建任务也需幂等，可用 request_id 做唯一约束。前端在提交时禁用按钮并展示 loading，携带当前 version；收到 409 后提示任务已被他人修改，拉取最新数据并让用户确认后重试；收到网络错误时不要盲目重试。审计日志与任务更新放在同一事务，后续可通过事件表或消息队列发送通知。",
+    "pitfalls": "只讲 CRUD 不讨论多人同时修改状态时的并发冲突；忽略权限校验和状态机约束，允许任意状态跳转；前端只做乐观更新但不处理 409 冲突和失败回滚。",
+    "followup": "如果同一任务状态更新非常频繁，乐观锁冲突严重，你会如何优化？如何保证创建任务接口在客户端重复提交时的幂等性？状态流转需要记录操作历史和通知，如何设计事件或消息机制？"
   },
-  "date": "2026-11-27",
-  "role": "前端工程师",
-  "practice_url": "https://github.com/jwasham/coding-interview-university"
+  "date": "2026-11-28",
+  "role": "全栈工程师",
+  "practice_url": "https://github.com/donnemartin/system-design-primer"
 }
